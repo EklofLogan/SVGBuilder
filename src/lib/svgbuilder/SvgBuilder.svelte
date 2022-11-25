@@ -1,6 +1,5 @@
 <script>
     import { onMount } from 'svelte';
-    import { svgState } from '$lib/stores';
     let app;
     let state = {
         textObjects: {
@@ -336,25 +335,13 @@
     let savedStates = [];
     let loaded = false;
     onMount(() => {
-        if ($svgState.canvas != null) {
-            state.loadState($svgState)
-            loaded = true;
-        } else {
-            svgState.set({
-                canvas: state.canvas,
-                objectList: state.textObjects.objectList
-            })
-            loaded = true;
-        }
+        
         if (localStorage.getItem("savedStates")) {
             savedStates = JSON.parse(localStorage.getItem("savedStates"))
         }
         document.addEventListener("keypress", handleKeypress);
         document.addEventListener('mouseover', hover)
     })
-    $: if (loaded) {
-        svgState.set(state.getState())
-    }
     
     function getTime(ts) {
         let time = Math.round((Date.now()-ts)/1000)
@@ -373,8 +360,11 @@
             let svgBody = "";
             ariaDesc = state.textObjects.toString();
             state.textObjects.objectList.forEach(obj => {
+                let textbb = document.getElementById(obj.id).getBoundingClientRect();
+                let svgbb = document.getElementById("cnvs").getBoundingClientRect();
+                let calculatedWidth = (textbb.width/svgbb.width)*state.canvas.width;
                 let str = 
-                `<text text-decoration="${obj.textDecoration}" font-style="${obj.italic ? "italic" : "none"}" fill="${obj.color}" font-weight="${obj.fontWeight}" dominant-baseline="${obj.dominantBaseline}" text-anchor="${obj.textAnchor}" x="${obj.x+obj.xUnit}" y="${obj.y+obj.yUnit}" font-size="${obj.fontSize+"px"}">${obj.text}</text>`
+                `<text textLength="${calculatedWidth}px" text-decoration="${obj.textDecoration}" font-style="${obj.italic ? "italic" : "none"}" fill="${obj.color}" font-weight="${obj.fontWeight}" dominant-baseline="${obj.dominantBaseline}" text-anchor="${obj.textAnchor}" x="${obj.x+obj.xUnit}" y="${obj.y+obj.yUnit}" font-size="${obj.fontSize+"px"}">${obj.text}</text>`
                 svgBody += str;
                 ariaDesc += obj.text + " ";
             })
@@ -392,8 +382,11 @@
         let svgBody = "";
         ariaDesc = state.textObjects.toString();
         state.textObjects.objectList.forEach(obj => {
+            let textbb = document.getElementById(obj.id).getBoundingClientRect();
+            let svgbb = document.getElementById("cnvs").getBoundingClientRect();
+            let calculatedWidth = (textbb.width/svgbb.width)*state.canvas.width;
             let str = 
-            `<text text-decoration="${obj.textDecoration}" font-style="${obj.italic ? "italic" : "none"}" fill="${obj.color}" font-weight="${obj.fontWeight}" dominant-baseline="${obj.dominantBaseline}" text-anchor="${obj.textAnchor}" x="${obj.x+obj.xUnit}" y="${obj.y+obj.yUnit}" font-size="${obj.fontSize+"px"}">${obj.text}</text>`
+            `<text textLength="${calculatedWidth}px" text-decoration="${obj.textDecoration}" font-style="${obj.italic ? "italic" : "none"}" fill="${obj.color}" font-weight="${obj.fontWeight}" dominant-baseline="${obj.dominantBaseline}" text-anchor="${obj.textAnchor}" x="${obj.x+obj.xUnit}" y="${obj.y+obj.yUnit}" font-size="${obj.fontSize+"px"}">${obj.text}</text>`
             svgBody += str;
             ariaDesc += obj.text + " ";
         })
@@ -922,10 +915,10 @@
     .application {
         box-sizing: border-box;
         width: 100%;
-        height:calc(100% - 62px);
+        height: 100%;
         background-color: #c2c2c2;
         position: fixed;
-        top: 62px;
+        top: 0px;
         left: 0;
         z-index: 1000;
         display: grid;
@@ -1300,7 +1293,7 @@
     }
     .help__container {
         width: 100%;
-        height: 630px;
+        height: 610px;
         display: grid;
         grid-template-columns: 180px 1fr;
     }
@@ -1336,6 +1329,7 @@
     }
     .help__content {
         overflow: auto;
+        padding: 0 8px;
     }
     .help__content > p {
         max-width: unset;
