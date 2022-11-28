@@ -322,7 +322,7 @@
         btn.classList.add("active__button")
         let id = event.target.id;
         let menu = document.getElementById(id+"Menu");
-        menu.style.display = "block";   
+        menu.style.display = "flex";  
     }
     function closeMenu(event) {
         if (event.target.parentNode.matches(".btn__menu")) return;
@@ -926,9 +926,6 @@
         border: 2px solid #000;
         overflow: hidden;
         color: #fff;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
-          "Segoe UI Symbol";
     }
     .canvas__container {
         display: flex;
@@ -984,10 +981,12 @@
     }
     .menu__panel {
         position: absolute;
+        flex-direction: column;
         display: none;
         min-width: 100px;
         max-width: 300px;
         width: max-content;
+        background-color: #666;
     }
     .menu__panel > button {
         text-align: left;
@@ -995,6 +994,7 @@
         height: 100%;
         border: none;
         color: #fff;
+        padding: 4px;
         background-color: #666;
     }
     .menu__panel > button:hover {
@@ -1175,21 +1175,21 @@
         max-height: 200px;
     }
     .load__action {
-        background-color: #00b;
+        background-color: #222;
         border-radius: 3px;
         border: none;
         color: #fff;
         font-weight: 600;
     }
     .delete__action {
-        background-color: #c00;
+        background-color: #222;
         border-radius: 3px;
         border: none;
         color: #fff;
         font-weight: 600;
     }
     .export__action {
-        background-color: #0a0;
+        background-color: #222;
         border-radius: 3px;
         border: none;
         color: #fff;
@@ -1203,7 +1203,7 @@
         height: fit-content;
     }
     .create__save {
-        background-color: #00a;
+        background-color: #222;
         border-radius: 3px;
         border: none;
         color: #fff;
@@ -1213,6 +1213,15 @@
     .input__box {
         display: grid;
         grid-template-columns: 100px 1fr 100px;
+    }
+    .input__container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+    }
+    .input__box > input {
+        width: auto;
     }
     .export__modal {
         display: none;
@@ -1480,7 +1489,7 @@
             {:else}
             <div class="input__box">
                 <span>Save Name: </span>
-                <input type="text" style="width: 100%" bind:value={newSaveName}>
+                <input type="text" bind:value={newSaveName}>
                 <button class="load__action" on:click={insertSave}>Save</button>
             </div>
             {/if}
@@ -1491,7 +1500,7 @@
                 <div class="save__actions">
                     <span class="entry__name">{s.name}</span>
                     <button class="export__action" on:click={()=>{}}>Export</button>
-                    <button class="load__action" on:click={()=>{state.loadState(s)}}>Load</button>
+                    <button class="load__action" on:click={()=>{state.loadState(s); savesModal = false;}}>Load</button>
                     <button class="delete__action" on:click={()=>{deleteSave(s.id)}}>Delete</button>
                 </div>
                 <div class="save__preview">
@@ -1578,7 +1587,11 @@
         {#if !state.exportMode}
             {#if !selected}
             <div class="options" id="unselected">
-                <button class="option__btn" style="font-size:60px;line-height:0; width: 70px;" on:click={()=>{state.textObjects.createObject()}}>+</button>
+                <button class="option__btn" style="font-size:60px;line-height:0; width: 70px;" on:click={()=>{state.textObjects.createObject()}}>
+                    <svg viewBox="0 0 369.946 369.946">
+                        <path fill="#fff" d="M184.973,0C82.975,0,0,82.975,0,184.973s82.975,184.973,184.973,184.973   s184.973-82.975,184.973-184.973S286.971,0,184.973,0z M256.575,190.94H190.94v65.636h-11.934V190.94h-65.636v-11.934h65.636   v-65.636h11.934v65.636h65.636V190.94z"/>
+                    </svg>
+                </button>
                 <div class="options__input">
                     <div class="input__container">
                         <span>Canvas Height:</span>
