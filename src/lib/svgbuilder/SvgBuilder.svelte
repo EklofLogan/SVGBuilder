@@ -142,6 +142,7 @@
     }
     function handleKeypress(event) {
         if (state.exportMode) return;
+        console.log(event.which)
         if (event.code == "KeyZ" && event.ctrlKey && !event.shiftKey) {
             undo()
         }
@@ -150,6 +151,10 @@
         }
         if (event.code == "KeyY" && event.ctrlKey) {
             redo()
+        }
+        if (event.key == "Backspace") {
+            if (document.activeElement.matches("input")) return;
+            _delete()
         }
     }
     let edit = false;
@@ -322,7 +327,7 @@
         btn.classList.add("active__button")
         let id = event.target.id;
         let menu = document.getElementById(id+"Menu");
-        menu.style.display = "flex";  
+        menu.style.display = "block";   
     }
     function closeMenu(event) {
         if (event.target.parentNode.matches(".btn__menu")) return;
@@ -335,13 +340,15 @@
     let savedStates = [];
     let loaded = false;
     onMount(() => {
-        
         if (localStorage.getItem("savedStates")) {
             savedStates = JSON.parse(localStorage.getItem("savedStates"))
         }
-        document.addEventListener("keypress", handleKeypress);
+        document.addEventListener("keydown", handleKeypress);
         document.addEventListener('mouseover', hover)
     })
+    $: if (loaded) {
+        svgState.set(state.getState())
+    }
     
     function getTime(ts) {
         let time = Math.round((Date.now()-ts)/1000)
@@ -355,25 +362,14 @@
         return string;
     }
     let exportedCode = "";
+    let exportedObjs = "";
     function _export() {
         if (state.exportMode == true) {
             let svgBody = "";
-            ariaDesc = state.textObjects.toString();
-            state.textObjects.objectList.forEach(obj => {
-                let textbb = document.getElementById(obj.id).getBoundingClientRect();
-                let svgbb = document.getElementById("cnvs").getBoundingClientRect();
-                let calculatedWidth = (textbb.width/svgbb.width)*state.canvas.width;
-                let str = 
-                `<text textLength="${calculatedWidth}px" text-decoration="${obj.textDecoration}" font-style="${obj.italic ? "italic" : "none"}" fill="${obj.color}" font-weight="${obj.fontWeight}" dominant-baseline="${obj.dominantBaseline}" text-anchor="${obj.textAnchor}" x="${obj.x+obj.xUnit}" y="${obj.y+obj.yUnit}" font-size="${obj.fontSize+"px"}">${obj.text}</text>`
-                svgBody += str;
-                ariaDesc += obj.text + " ";
-            })
             let vb = state.canvas.viewbox ? `viewbox="0 0 ${state.canvas.width} ${state.canvas.height}"` : `height="${state.canvas.height}" width="${state.canvas.width}"`;
-            exportedCode = `<svg ${vb} style="background-color:${state.canvas.background};font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji','Segoe UI Symbol';height: ${svgHeight}" aria-labeled-by="${ariaTitle} ${ariaTitle + "d"}"><title id="${ariaTitle}">${ariaTitle}</title><desc id="${ariaTitle + "d"}">${ariaDesc}</desc>${svgBody}</svg>`
-            console.log('updated exported code');
+            exportedCode = `<svg ${vb} style="background-color:${state.canvas.background};font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji','Segoe UI Symbol';height: ${svgHeight}" aria-labeled-by="${ariaTitle} ${ariaTitle + "d"}"><title id="${ariaTitle}">${ariaTitle}</title><desc id="${ariaTitle + "d"}">${ariaDesc}</desc>${exportedObjs}</svg>`
             if (wrapped) {
                 exportedCode = `<div style="display:flex;justify-content:center;align-items:center;width:100%;height:${containerHeight}px;background-color:${state.canvas.background}">${exportedCode}</div>`
-                console.log(exportedCode);
             }
         }
         transPos={x:0,y:0};
@@ -381,15 +377,16 @@
         scale = 1;
         let svgBody = "";
         ariaDesc = state.textObjects.toString();
+        ariaTitle = state.textObjects.objectList[0] ? state.textObjects.objectList[0].text : "Title";
         state.textObjects.objectList.forEach(obj => {
             let textbb = document.getElementById(obj.id).getBoundingClientRect();
             let svgbb = document.getElementById("cnvs").getBoundingClientRect();
-            let calculatedWidth = (textbb.width/svgbb.width)*state.canvas.width;
+            let calcWidth = (textbb.width/svgbb.width)*state.canvas.width;
             let str = 
-            `<text textLength="${calculatedWidth}px" text-decoration="${obj.textDecoration}" font-style="${obj.italic ? "italic" : "none"}" fill="${obj.color}" font-weight="${obj.fontWeight}" dominant-baseline="${obj.dominantBaseline}" text-anchor="${obj.textAnchor}" x="${obj.x+obj.xUnit}" y="${obj.y+obj.yUnit}" font-size="${obj.fontSize+"px"}">${obj.text}</text>`
+            `<text textLength="${calcWidth}px" text-decoration="${obj.textDecoration}" font-style="${obj.italic ? "italic" : "none"}" fill="${obj.color}" font-weight="${obj.fontWeight}" dominant-baseline="${obj.dominantBaseline}" text-anchor="${obj.textAnchor}" x="${obj.x+obj.xUnit}" y="${obj.y+obj.yUnit}" font-size="${obj.fontSize+"px"}">${obj.text}</text>`
             svgBody += str;
-            ariaDesc += obj.text + " ";
         })
+        exportedObjs = svgBody;
         let vb = state.canvas.viewbox ? `viewbox="0 0 ${state.canvas.width} ${state.canvas.height}"` : `height="${state.canvas.height}" width="${state.canvas.width}"`;
         exportedCode = `<svg ${vb} style="background-color:${state.canvas.background};font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji','Segoe UI Symbol';height: ${svgHeight}" aria-labeled-by="${ariaTitle} ${ariaTitle + "d"}"><title id="${ariaTitle}">${ariaTitle}</title><desc id="${ariaTitle + "d"}">${ariaDesc}</desc>${svgBody}</svg>`
         if (wrapped) {
@@ -697,13 +694,8 @@
 
         document.body.removeChild(element);
     }
-    function copy(event) {
+    function copy() {
         clipboardCopy(exportedCode);
-        event.target.textContent = "Copied"
-        setTimeout(() =>{
-            event.target.textContent = "Copy SVG to Clipboard"
-            clearTimeout();
-        }, 1000)
     }
     let clipboardCopySupported = true;
     let visuallyHidden = 'position:absolute;height:1px;width:1px;overflow:hidden;clip:rect(1px,1px,1px,1px)';
@@ -831,77 +823,6 @@
     }
 </script>
 <svelte:window on:beforeunload={onbeforeunload}/>
-<div class="styles">
-    <style id="checkbox">
-        /* Customize the label (the container) */
-        .container {
-        display: block;
-        position: relative;
-        padding-left: 35px;
-        margin-bottom: 12px;
-        cursor: pointer;
-        font-size: 22px;
-        -webkit-user-select: none;
-        -moz-user-select: none;
-        -ms-user-select: none;
-        user-select: none;
-        }
-    
-        /* Hide the browser's default checkbox */
-        .container input {
-        position: absolute;
-        opacity: 0;
-        cursor: pointer;
-        height: 0;
-        width: 0;
-        }
-    
-        /* Create a custom checkbox */
-        .checkmark {
-        position: absolute;
-        top: 0;
-        left: 0;
-        height: 22px;
-        width: 22px;
-        background-color: #555;
-        }
-    
-        /* On mouse-over, add a grey background color */
-        .container:hover input ~ .checkmark {
-        background-color: #ccc;
-        }
-    
-        /* When the checkbox is checked, add a blue background */
-        .container input:checked ~ .checkmark {
-        background-color: #999;
-        }
-    
-        /* Create the checkmark/indicator (hidden when not checked) */
-        .checkmark:after {
-        content: "";
-        position: absolute;
-        display: none;
-        }
-    
-        /* Show the checkmark when checked */
-        .container input:checked ~ .checkmark:after {
-        display: block;
-        }
-    
-        /* Style the checkmark/indicator */
-        .container .checkmark:after {
-        left: 9px;
-        top: 5px;
-        width: 5px;
-        height: 10px;
-        border: solid white;
-        border-width: 0 3px 3px 0;
-        -webkit-transform: rotate(45deg);
-        -ms-transform: rotate(45deg);
-        transform: rotate(45deg);
-        }
-    </style>
-</div>
 <style>
     .text__object {
         -webkit-user-select: none; /* Safari */        
@@ -918,7 +839,7 @@
         height: 100%;
         background-color: #c2c2c2;
         position: fixed;
-        top: 0px;
+        top: 0;
         left: 0;
         z-index: 1000;
         display: grid;
@@ -926,6 +847,9 @@
         border: 2px solid #000;
         overflow: hidden;
         color: #fff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+          "Segoe UI Symbol";
     }
     .canvas__container {
         display: flex;
@@ -942,6 +866,9 @@
     .controls {
         background-color: #333;
         z-index: 10;
+        display: grid;
+        grid-template-rows: 30px 1fr;
+        height: fit-content;
     }
     .controls__menu {
         width: 100%;
@@ -958,8 +885,8 @@
     }
     .options {
         display: flex;
-        gap: 5px;
-        height: calc(100% - 30px);
+        align-items: center;
+        gap: 8px;
     }
     .btn__menu {
         position: relative;
@@ -967,14 +894,9 @@
         margin: 0;
         z-index: 1001;
     }
-    .options > button {
-        height: 100%;
-        border: none;
-        background: none;
-        color: #fff;
-    }
-    .options > button {
-        height: 100%;
+    .options__input > button {
+        height: 98px;
+        width: 98px;
         border: none;
         background: none;
         color: #fff;
@@ -1012,8 +934,7 @@
         align-items: end;
         justify-content: center;
         flex-direction: column;
-        border-right: 1px solid #222;
-        padding: 0 5px;
+        gap: 4px;
     }
     input, select {
         background-color: #555;
@@ -1027,7 +948,8 @@
         text-align: end;
     }
     select {
-        width: 40px
+        width: 52px;
+        height: 30px;
     }
     .wide {
         width: 80px;
@@ -1084,15 +1006,28 @@
         background: #888;
     }
     .text__area {
-        position: absolute;
+        display: inline-block;
         background-color: #333;
-        top: 70px;
+        top: 84px;
         width: 100%;
-        padding: 3px 6px;
-        border-top: 1px solid #222;
+        padding: 3px 4px;
+    }
+    .option__btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .option__btn > span {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #444;
+        border-radius: 4px;
+        height: 72px;
+        width: 72px;
     }
     .option__btn:hover {
-        background-color: #444;
+        background-color: #555;
     }
     .option__btn:active {
         background-color: #666;
@@ -1219,6 +1154,10 @@
         justify-content: space-between;
         align-items: center;
         width: 100%;
+        background-color: #444;
+        border-radius: 4px;
+        padding: 4px 12px;
+        white-space: nowrap;
     }
     .input__box > input {
         width: auto;
@@ -1289,7 +1228,8 @@
         margin: 8px 2%;
     }
     .help__modal {
-        display: block;
+        display: grid;
+        grid-template-rows: 20px 56px 626px;
         position: absolute;
         top: calc(50% - 300px);
         left: calc(50% - 500px);
@@ -1298,11 +1238,11 @@
         background: #333;
         z-index: 10000;
         border-radius: 10px;
+        border: 1px solid #777;
         overflow: hidden;
     }
     .help__container {
         width: 100%;
-        height: 610px;
         display: grid;
         grid-template-columns: 180px 1fr;
     }
@@ -1346,12 +1286,15 @@
     }
     .config__menu {
         position: absolute;
-        top: 105px;
+        top: 132px;
         left: 0;
         background-color: #333;
         padding: 4px 8px;
         width: 250px;
         z-index: 99;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
     }
     textarea {
         max-width: 230px;
@@ -1361,6 +1304,114 @@
         border: 1px solid #333;
         outline: none !important;
         color: #fff;
+    }
+    .checkbox {
+        height: 24px;
+        width: 24px;
+        background-color: #666;
+    }
+    .checkbox > svg {
+        display: none;
+    }
+    .checkbox > svg.active {
+        display: block;
+    }
+    .btn-slim {
+        height: fit-content !important;
+    }
+    .btn-slim > span {
+        height: unset;
+        padding: 4px;
+    }
+    .grid-align {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-rows: 1fr 1fr 1fr;
+        height: 76px;
+        width: 76px;
+        gap: 1px;
+    }
+    .align__btn {
+        background-color: #444;
+    }
+    .top-menu {
+        display: flex;
+        width: 100%;
+        height: fit-content;
+        gap: 4px;
+    }
+    .menu__item {
+        height: 84px;
+        max-height: 84px;
+        width: fit-content;
+        display: flex;
+        align-items: center;
+        justify-content: space-evenly;
+        flex-direction: column;
+    }
+    .menu-btn {
+        height: 84px;
+        width: 84px;
+        background: none;
+        border: 0;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+    }
+    .menu-btn:hover {
+        background: #555;
+    }
+    .menu-btn:active {
+        background: #666;
+    }
+    .menu-btn > span {
+        display: block;
+        box-sizing: content-box;
+        background: #444;
+        height: 76px;
+        width: 76px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 5px;
+    }
+    .menu__input-wrapper {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        min-width: 168px;
+        background: #444;
+        padding: 0 6px;
+        border-radius: 5px;
+        font-size: 16px;
+        height: 36px;
+    }
+    .inputbox {
+        border-radius: 5px;
+        font-size:  15px;
+        padding: 0 4px;
+    }
+    .menu__input-wrapper.color-picker > span {
+        grid-area: label;
+    }
+    .color-picker {
+        display: grid;
+        grid-template-areas: 
+        "label input"
+        "picker picker";
+        column-gap: 8px;
+        height: 76px;
+    }
+    .color-picker > .inputbox {
+        grid-area: input;
+    }
+    .inputpicker {
+        grid-area: picker;
+        border-radius: 5px;
+        width: 100% !important;
     }
 </style>
 <div class="hoverBox" style="display:none;border-radius:3px;pointer-events:none;border:2px solid #53f;position:absolute;z-index:9999999;height:40px;width:100px;transform:scale(1.01);top:0;left:0;" bind:this={d}></div>
@@ -1489,7 +1540,7 @@
             {:else}
             <div class="input__box">
                 <span>Save Name: </span>
-                <input type="text" bind:value={newSaveName}>
+                <input type="text" style="width: 100%" bind:value={newSaveName}>
                 <button class="load__action" on:click={insertSave}>Save</button>
             </div>
             {/if}
@@ -1500,7 +1551,7 @@
                 <div class="save__actions">
                     <span class="entry__name">{s.name}</span>
                     <button class="export__action" on:click={()=>{}}>Export</button>
-                    <button class="load__action" on:click={()=>{state.loadState(s); savesModal = false;}}>Load</button>
+                    <button class="load__action" on:click={()=>{state.loadState(s)}}>Load</button>
                     <button class="delete__action" on:click={()=>{deleteSave(s.id)}}>Delete</button>
                 </div>
                 <div class="save__preview">
@@ -1586,120 +1637,162 @@
         </div>
         {#if !state.exportMode}
             {#if !selected}
-            <div class="options" id="unselected">
-                <button class="option__btn" style="font-size:60px;line-height:0; width: 70px;" on:click={()=>{state.textObjects.createObject()}}>
-                    <svg viewBox="0 0 369.946 369.946">
-                        <path fill="#fff" d="M184.973,0C82.975,0,0,82.975,0,184.973s82.975,184.973,184.973,184.973   s184.973-82.975,184.973-184.973S286.971,0,184.973,0z M256.575,190.94H190.94v65.636h-11.934V190.94h-65.636v-11.934h65.636   v-65.636h11.934v65.636h65.636V190.94z"/>
-                    </svg>
-                </button>
-                <div class="options__input">
-                    <div class="input__container">
+            <div class="top-menu" id="unselected">
+                <div class="menu__item">
+                    <button class="menu-btn" on:click={()=>{state.textObjects.createObject()}}>
+                        <span>
+                            <svg height="48px" viewBox="0 0 369.946 369.946">
+                                <path fill="#fff" d="M184.973,0C82.975,0,0,82.975,0,184.973s82.975,184.973,184.973,184.973   s184.973-82.975,184.973-184.973S286.971,0,184.973,0z M256.575,190.94H190.94v65.636h-11.934V190.94h-65.636v-11.934h65.636   v-65.636h11.934v65.636h65.636V190.94z"/>
+                            </svg>
+                        </span>
+                    </button>
+                </div>
+                <div class="menu__item">
+                    <div class="menu__input-wrapper">
                         <span>Canvas Height:</span>
-                        <input type="number" bind:value={state.canvas.height} min="0">
+                        <input class="inputbox" type="number" bind:value={state.canvas.height} min="0">
                     </div>
-                    <div class="input__container">
+                    <div class="menu__input-wrapper">
                         <span>Canvas Width:</span>
-                        <input type="number" bind:value={state.canvas.width} min="0">
+                        <input class="inputbox" type="number" bind:value={state.canvas.width} min="0">
                     </div>
                 </div>
-                <div class="options__input">
-                    <div class="input__container" style="display:flex">
-                        <span>Viewbox:&MediumSpace;</span>
-                        <label class="container">
-                            <input type="checkbox" bind:checked={state.canvas.viewbox} style="display:none">
-                            <span class="checkmark"></span>
-                        </label>
+                <div class="menu__item">
+                    <div class="menu__input-wrapper color-picker">
+                        <span>Canvas Color:</span>
+                        <input class="inputbox" type="text" style="width: 100px" bind:value={state.canvas.background} on:change={() =>{if (state.canvas.background == null) state.canvas.color = "#fff"}}>
+                        <input class="inputpicker" type="color" bind:value={state.canvas.background} on:change={() =>{if (state.canvas.background == null) state.canvas.color = "#fff"}}>
                     </div>
                 </div>
-                <div class="options__input">
-                    <div class="input__container">
-                        <span>Background Color:</span>
-                        <input type="text" style="width: 100px" bind:value={state.canvas.background} on:change={() =>{if (state.canvas.background == null) state.canvas.color = "#fff"}}>
-                    </div>
+                <div class="menu__item">
+                    <button title="Export" class="menu-btn" on:click={_export}>
+                        <span>
+                            <svg style="width:24px;height:24px" viewBox="0 0 24 24">
+                                <path fill="currentColor" d="M12,1L8,5H11V14H13V5H16M18,23H6C4.89,23 4,22.1 4,21V9A2,2 0 0,1 6,7H9V9H6V21H18V9H15V7H18A2,2 0 0,1 20,9V21A2,2 0 0,1 18,23Z" />
+                            </svg>
+                        </span>
+                    </button>
                 </div>
-                <button class="option__btn" on:click={_export}>Export</button>
             </div>
             {:else}
                 {#key selObj}
-                    <div class="options" id="selected" style="position:relative">
-                        <button class="option__btn" style="border-right: 1px solid #222" on:click={deselect}>Deselect</button>
-                        <div class="options__input">
-                            <div class="input__container">
+                    <div class="top-menu" id="selected" style="position:relative">
+                        <div class="menu__item"><button title="Deselect" class="menu-btn" on:click={deselect}>
+                            <span>
+                                <svg style="width:24px;height:24px" viewBox="0 0 24 24">
+                                    <path fill="currentColor" d="M1,4.27L2.28,3L21,21.72L19.73,23L17,20.27V21H15V19H15.73L5,8.27V9H3V7H3.73L1,4.27M20,3A1,1 0 0,1 21,4V5H19V3H20M15,5V3H17V5H15M11,5V3H13V5H11M7,5V3H9V5H7M11,21V19H13V21H11M7,21V19H9V21H7M4,21A1,1 0 0,1 3,20V19H5V21H4M3,15H5V17H3V15M21,15V17H19V15H21M3,11H5V13H3V11M21,11V13H19V11H21M21,7V9H19V7H21Z" />
+                                </svg>
+                            </span>
+                        </button></div>
+                        <div class="menu__item">
+                            <div class="menu__input-wrapper">
                                 <span>Object X:</span>
-                                <input type="number" bind:value={state.selectedObject.x} min="0" on:change={() =>{if (state.selectedObject.x == null) state.selectedObject.x = 0}}>
-                                <select name="" id="" bind:value={state.selectedObject.xUnit} on:change={()=>{if (state.selectedObject.xUnit == "px") {state.selectedObject.x = state.canvas.width*(state.selectedObject.x/100)}; if (state.selectedObject.xUnit == "%") {state.selectedObject.x = ((state.selectedObject.x)/state.canvas.width)*100}}}>
+                                <input class="inputbox" type="number" bind:value={state.selectedObject.x} min="0" on:change={() =>{if (state.selectedObject.x == null) state.selectedObject.x = 0}}>
+                                <select class="inputbox" name="" id="" bind:value={state.selectedObject.xUnit} on:change={()=>{if (state.selectedObject.xUnit == "px") {state.selectedObject.x = state.canvas.width*(state.selectedObject.x/100)}; if (state.selectedObject.xUnit == "%") {state.selectedObject.x = ((state.selectedObject.x)/state.canvas.width)*100}}}>
                                     <option value="px">px</option>
                                     <option value="%">%</option>
                                 </select>
                             </div>
-                            <div class="input__container">
+                            <div class="menu__input-wrapper">
                                 <span>Object Y:</span>
-                                <input type="number" bind:value={state.selectedObject.y} min="0" on:change={() =>{if (state.selectedObject.y == null) state.selectedObject.y = 0}}>
-                                <select name="" id="" bind:value={state.selectedObject.yUnit} on:change={()=>{if (state.selectedObject.yUnit == "px") {state.selectedObject.y = state.canvas.height*(state.selectedObject.y/100)}; if (state.selectedObject.yUnit == "%") {state.selectedObject.y = ((state.selectedObject.y)/state.canvas.height)*100}}}>
+                                <input class="inputbox" type="number" bind:value={state.selectedObject.y} min="0" on:change={() =>{if (state.selectedObject.y == null) state.selectedObject.y = 0}}>
+                                <select class="inputbox" name="" id="" bind:value={state.selectedObject.yUnit} on:change={()=>{if (state.selectedObject.yUnit == "px") {state.selectedObject.y = state.canvas.height*(state.selectedObject.y/100)}; if (state.selectedObject.yUnit == "%") {state.selectedObject.y = ((state.selectedObject.y)/state.canvas.height)*100}}}>
                                     <option value="px">px</option>
                                     <option value="%">%</option>
                                 </select>
                             </div>
                         </div>
-                        <div class="options__input">
-                            <div class="input__container">
+                        <div class="menu__item">
+                            <div class="menu__input-wrapper">
                                 <span>Text Anchor:</span>
-                                <select name="" class="wide" bind:value={state.selectedObject.textAnchor}>
+                                <select name="" class="wide inputbox" bind:value={state.selectedObject.textAnchor}>
                                     <option value="start">Start</option>
                                     <option value="middle">Middle</option>
                                     <option value="end">End</option>
                                 </select>
                             </div>
-                            <div class="input__container">
+                            <div class="menu__input-wrapper">
                                 <span>Baseline:</span>
-                                <select name="" class="wide" bind:value={state.selectedObject.dominantBaseline}>
+                                <select name="" class="wide inputbox" bind:value={state.selectedObject.dominantBaseline}>
                                     <option value="hanging">Top</option>
                                     <option value="middle">Center</option>
                                     <option value="auto">Bottom</option>
                                 </select>
                             </div>
                         </div>
-                        <div class="options__input">
-                            <div class="input__container">
+                        <div class="menu__item">
+                            <div class="grid-align">
+                                <div class="align__btn"></div>
+                                <div class="align__btn"></div>
+                                <div class="align__btn"></div>
+                                <div class="align__btn"></div>
+                                <div class="align__btn"></div>
+                                <div class="align__btn"></div>
+                                <div class="align__btn"></div>
+                                <div class="align__btn"></div>
+                                <div class="align__btn"></div>
+                            </div>
+                        </div>
+                        <div class="menu__item">
+                            <div class="menu__input-wrapper">
                                 <span>Font size:</span>
-                                <input type="number" style="width: 35px" bind:value={state.selectedObject.fontSize} min="0" on:change={() =>{if (state.selectedObject.fontSize == null) state.selectedObject.fontSize = 1}}>
+                                <input class="inputbox" type="number" style="width: 35px" bind:value={state.selectedObject.fontSize} min="0" on:change={() =>{if (state.selectedObject.fontSize == null) state.selectedObject.fontSize = 1}}>
                             </div>
-                            <div class="input__container">
+                            <div class="menu__input-wrapper">
                                 <span>Font Weight:</span>
-                                <input type="number" style="width: 35px" bind:value={state.selectedObject.fontWeight} min="100" on:change={() =>{if (state.selectedObject.fontWeight == null) state.selectedObject.fontWeight = 100}}>
+                                <input class="inputbox" type="number" style="width: 35px" bind:value={state.selectedObject.fontWeight} min="100" on:change={() =>{if (state.selectedObject.fontWeight == null) state.selectedObject.fontWeight = 100}}>
                             </div>
                         </div>
-                        <div class="options__input">
-                            <div class="input__container">
+                        <div class="menu__item">
+                            <div class="menu__input-wrapper color-picker">
                                 <span>Font Color:</span>
-                                <input type="text" style="width: 100px" bind:value={state.selectedObject.color} on:change={() =>{if (state.selectedObject.color == null) state.selectedObject.color = "#000"}}>
+                                <input class="inputbox" type="text" style="width: 100px" bind:value={state.selectedObject.color} on:change={() =>{if (state.selectedObject.color == null) state.selectedObject.color = "#000"}}>
+                                <input class="inputpicker" type="color" bind:value={state.selectedObject.color} on:change={() =>{if (state.selectedObject.color == null) state.selectedObject.color = "#000"}}>
                             </div>
                         </div>
-                        <div class="options__input">
-                            <div class="input__container">
-                                <span>Text Decoration:</span>
-                                <select name="" class="wide" bind:value={state.selectedObject.textDecoration}>
+                        <div class="menu__item">
+                            <div class="menu__input-wrapper">
+                                <span>Text Decoration:&nbsp;</span>
+                                <select name="" class="inputbox wide" bind:value={state.selectedObject.textDecoration}>
                                     <option value="none">None</option>
                                     <option value="underline">Underline</option>
                                     <option value="line-through">Line-through</option>
                                 </select>
                             </div>
                         </div>
-                        <div class="options__input" style="margin:0">
-                            <div class="input__container" style="display:flex">
+                        <div class="menu__item" style="margin:0">
+                            <div class="menu__input-wrapper" style="display:flex">
                                 <span>Italic:&MediumSpace;</span>
                                 <label class="container">
                                     <input type="checkbox" bind:checked={state.selectedObject.italic} style="display:none">
-                                    <span class="checkmark"></span>
+                                    <div class="checkbox">
+                                        <svg class:active={state.selectedObject.italic} style="width:24px;height:24px" viewBox="0 0 24 24">
+                                            <path fill="currentColor" d="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" />
+                                        </svg>
+                                    </div>
                                 </label>
                             </div>
                         </div>
-                        <button class="option__btn" style="border-right: 1px solid #222" on:click={_delete}>Delete</button>
-                        <button class="option__btn" style="border-right: 1px solid #222" on:click={state.textObjects.duplicateObject}>Duplicate</button>
+                        <div class="menu__item"><button title="Delete" class="menu-btn" on:click={_delete}>
+                            <span>
+                                <svg style="width:24px;height:24px" viewBox="0 0 24 24">
+                                    <path fill="currentColor" d="M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19M8,9H16V19H8V9M15.5,4L14.5,3H9.5L8.5,4H5V6H19V4H15.5Z" />
+                                </svg>
+                            </span>
+                        </button></div>
+                        <div class="menu__item"><button title="Duplicate" class="menu-btn" on:click={state.textObjects.duplicateObject}>
+                            <span>
+                                <svg style="width:24px;height:24px" viewBox="0 0 24 24">
+                                    <path fill="currentColor" d="M16,8H14V11H11V13H14V16H16V13H19V11H16M2,12C2,9.21 3.64,6.8 6,5.68V3.5C2.5,4.76 0,8.09 0,12C0,15.91 2.5,19.24 6,20.5V18.32C3.64,17.2 2,14.79 2,12M15,3C10.04,3 6,7.04 6,12C6,16.96 10.04,21 15,21C19.96,21 24,16.96 24,12C24,7.04 19.96,3 15,3M15,19C11.14,19 8,15.86 8,12C8,8.14 11.14,5 15,5C18.86,5 22,8.14 22,12C22,15.86 18.86,19 15,19Z" />
+                                </svg>
+                            </span>
+                        </button></div>
+                    </div>
+                    <div class="top-menu">
                         <div class="text__area">
-                            <div class="input__container" style="display:grid;grid-template-columns:100px 1fr;">
+                            <div class="menu__input-wrapper" style="display:grid;grid-template-columns:100px 1fr;">
                                 <span>Text Content:</span>
-                                <input type="text" style="text-align:start; width:auto" bind:value={state.selectedObject.text} min="0" on:change={() =>{if (state.selectedObject.text == "") state.selectedObject.text = "Empty"; updateTitle()}}>
+                                <input class="inputbox" type="text" style="text-align:start; width:auto" bind:value={state.selectedObject.text} min="0" on:change={() =>{if (state.selectedObject.text == "") state.selectedObject.text = "Empty"; updateTitle()}}>
                             </div>
                         </div>
                     </div>
@@ -1707,12 +1800,38 @@
             {/if}
         {:else}
             <div class="options">
-                <button class="option__btn" style="border-right: 1px solid #222" on:click={()=>{state.exportMode = false;transPos={x:0,y:0};panTrans="translate3D(0,0,0)";scale = 1; document.getElementById("scaler").style.transform = ""}}>Exit Export</button>
-                <button class="option__btn" style="border-right: 1px solid #222" on:click={copy}>Copy Code to Clipboard</button>
-                <button class="option__btn" style="border-right: 1px solid #222" on:click={()=>{downloadModal = true}}>Download</button>
-                <button class="option__btn" style="border-right: 1px solid #222" on:click={()=>{updatePreview("d")}}>Preview Desktop</button>
                 <div class="options__input">
-                    <div class="input__container">
+                    <button title="Exit Export" class="menu-btn" on:click={()=>{state.exportMode = false;transPos={x:0,y:0};panTrans="translate3D(0,0,0)";scale = 1; document.getElementById("scaler").style.transform = ""}}>
+                        <span>
+                            <svg style="width:24px;height:24px" viewBox="0 0 24 24">
+                                <path fill="currentColor" d="M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z" />
+                            </svg>
+                        </span>
+                    </button>
+                </div>
+                <div class="options__input"><button title="Copy SVG to clipboard" class="menu-btn" on:click={copy}>
+                    <span>
+                        <svg style="width:24px;height:24px" viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" />
+                        </svg>
+                    </span>
+                </button></div>
+                <div class="options__input"><button title="Download" class="menu-btn" on:click={()=>{downloadModal = true}}>
+                    <span>
+                        <svg style="width:24px;height:24px" viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z" />
+                        </svg>
+                    </span>
+                </button></div>
+                <div class="options__input"><button title="Preview desktop" class="menu-btn" on:click={()=>{updatePreview("d")}}>
+                    <span>
+                        <svg style="width:24px;height:24px" viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M21,16H3V4H21M21,2H3C1.89,2 1,2.89 1,4V16A2,2 0 0,0 3,18H10V20H8V22H16V20H14V18H21A2,2 0 0,0 23,16V4C23,2.89 22.1,2 21,2Z" />
+                        </svg>
+                    </span>
+                </button></div>
+                <div class="options__input">
+                    <div class="menu__input-wrapper">
                         <span>Mobile Device Preview:</span>
                         <select name="" class="wide" bind:value={selectedMobile} on:change={()=>{updatePreview("m")}}>
                             <option value="none">None</option>
@@ -1724,9 +1843,7 @@
                             <option value="samsunggalaxys20ultra">Samsung Galaxy S20 Ultra</option>
                         </select>
                     </div>
-                </div>
-                <div class="options__input">
-                    <div class="input__container">
+                    <div class="menu__input-wrapper">
                         <span>Tablet Device Preview:</span>
                         <select name="" class="wide" bind:value={selectedTablet} on:change={()=>{updatePreview("t")}}>
                             <option selected value="none">None</option>
@@ -1737,11 +1854,11 @@
                     </div>
                 </div>
                 <div class="options__input">
-                    <div class="input__container">
+                    <div class="menu__input-wrapper">
                         <span>Preview Height:</span>
                         <input type="number" bind:value={previewHeight} min="0" on:change={()=>{updatePreview("r")}}>
                     </div>
-                    <div class="input__container">
+                    <div class="menu__input-wrapper">
                         <span>Preview Width:</span>
                         <input type="number" bind:value={previewWidth} min="0" on:change={()=>{updatePreview("r")}}>
                     </div>
@@ -1764,7 +1881,7 @@
             <span>Aria Title:</span>
             <input style="width:100%" type="text" bind:value={ariaTitle} on:change={_export}>
         </div>
-        <div class="input__container">
+        <div class="input__container" style="flex-direction:column">
             <span>Aria Description:</span>
             <textarea type="text" bind:value={ariaDesc} on:change={_export}/>
         </div>
